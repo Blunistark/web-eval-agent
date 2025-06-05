@@ -26,10 +26,13 @@ import logging
 import sys
 
 logging.basicConfig(
-    stream=sys.stderr,
     level=logging.INFO,
     format='%(levelname)s %(asctime)s %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
+    datefmt='%Y-%m-%d %H:%M:%S',
+    handlers=[
+        logging.FileHandler("mcp_server.log"),  # logs go to a file instead of stderr/stdout
+        # or logging.NullHandler() to discard logs completely
+    ]
 )
 
 # Create the MCP server
