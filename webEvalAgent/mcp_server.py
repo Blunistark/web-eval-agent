@@ -5,8 +5,6 @@ import os
 import argparse
 import traceback
 import uuid
-import logging
-import sys
 
 from enum import Enum
 
@@ -24,7 +22,8 @@ from webEvalAgent.src.browser_utils import cleanup_resources
 from webEvalAgent.src.api_utils import validate_api_key
 from webEvalAgent.src.tool_handlers import handle_web_app_ux_evaluation
 from webEvalAgent.src.cursorrules_utils import create_or_update_cursorrules
-
+import logging
+import sys
 
 logging.basicConfig(
     stream=sys.stderr,
@@ -32,6 +31,7 @@ logging.basicConfig(
     format='%(levelname)s %(asctime)s %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
+
 # Create the MCP server
 mcp = FastMCP("Operative")
 
