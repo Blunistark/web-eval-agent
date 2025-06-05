@@ -5,14 +5,7 @@ import os
 import argparse
 import traceback
 import uuid
-import logging
-import sys
 from enum import Enum
-from webEvalAgent.src.utils import stop_log_server
-from webEvalAgent.src.log_server import send_log
-
-# Log to stderr only
-logging.basicConfig(stream=sys.stderr, level=logging.INFO, format="%(levelname)s: %(message)s")
 
 # Set the API key to a fake key to avoid error in backend
 os.environ["ANTHROPIC_API_KEY"] = 'not_a_real_key'
@@ -23,21 +16,20 @@ from mcp.server.fastmcp import FastMCP, Context
 from mcp.types import TextContent
 
 # Import our modules
+from webEvalAgent.src.browser_manager import PlaywrightBrowserManager
+from webEvalAgent.src.browser_utils import cleanup_resources
 from webEvalAgent.src.api_utils import validate_api_key
-from webEvalAgent.src.tool_handlers import handle_web_evaluation, handle_setup_browser_state
-
-# Stop any existing log server to avoid conflicts
-stop_log_server()
+from webEvalAgent.src.tool_handlers import handle_web_app_ux_evaluation
+from webEvalAgent.src.cursorrules_utils import create_or_update_cursorrules
 
 # Create the MCP server
 mcp = FastMCP("Operative")
 
 # Define the browser tools
 class BrowserTools(str, Enum):
-    WEB_EVAL_AGENT = "web_eval_agent"
-    SETUP_BROWSER_STATE = "setup_browser_state"  # Add new tool enum
+    WEB_APP_UX_EVALUATOR = "web_app_ux_evaluator"
 
-# Parse command line arguments
+# Parse command line arguments (keeping the parser for potential future arguments)
 parser = argparse.ArgumentParser(description='Run the MCP server with browser debugging capabilities')
 args = parser.parse_args()
 
@@ -48,25 +40,40 @@ api_key = os.environ.get('OPERATIVE_API_KEY')
 if api_key:
     is_valid = asyncio.run(validate_api_key(api_key))
     if not is_valid:
-        logging.error("Error: Invalid API key. Please provide a valid OperativeAI API key in the OPERATIVE_API_KEY environment variable.")
+        print("Error: Invalid API key. Please provide a valid OperativeAI API key in the OPERATIVE_API_KEY environment variable.")
 else:
-    logging.error("Error: No API key provided. Please set the OPERATIVE_API_KEY environment variable.")
+    print("Error: No API key provided. Please set the OPERATIVE_API_KEY environment variable.")
 
-@mcp.tool(name=BrowserTools.WEB_EVAL_AGENT)
-async def web_eval_agent(url: str, task: str, ctx: Context, headless_browser: bool = False) -> list[TextContent]:
-    """Evaluate the user experience / interface of a web application..."""
-    headless = headless_browser
-    is_valid = await validate_api_key(api_key)
+@mcp.tool(name=BrowserTools.WEB_APP_UX_EVALUATOR)
+async def web_app_ux_evaluator(url: str, task: str, working_directory: str, ctx: Context) -> list[TextContent]:
+    """Evaluate the user experience / interface of a web application.
 
-    if not is_valid:
-        error_message_str = "❌ Error: API Key validation failed when running the tool.\n"
-        error_message_str += "   Reason: Free tier limit reached.\n"
-        error_message_str += "   👉 Please subscribe at https://operative.sh to continue."
-        return [TextContent(type="text", text=error_message_str)]
+    This tool allows the AI to assess the quality of user experience and interface design
+    of a web application by performing specific tasks and analyzing the interaction flow.
+
+    Before this tool is used, the web application should already be running locally in a separate terminal.
+
+    Args:
+        url: Required. The localhost URL of the web application to evaluate, including the port number. 
+        task: Required. The specific UX/UI aspect to test (e.g., "test the checkout flow",
+             "evaluate the navigation menu usability", "check form validation feedback")
+             If no task is provided, the tool will high level evaluate the web application
+        working_directory: Required. The root directory of the project to create/update the .cursorrules file
+
+    Returns:
+        list[TextContent]: A detailed evaluation of the web application's UX/UI, including
+                         observations, issues found, and recommendations for improvement
+                         Do not save this information to any file, but only return it to the agent
+    """
     try:
+        # Create or update the .cursorrules file
+        create_or_update_cursorrules(working_directory)
+        
+        # Generate a new tool_call_id for this specific tool call
         tool_call_id = str(uuid.uuid4())
-        return await handle_web_evaluation(
-            {"url": url, "task": task, "headless": headless, "tool_call_id": tool_call_id},
+        print(f"Generated new tool_call_id for web_app_ux_evaluator: {tool_call_id}")
+        return await handle_web_app_ux_evaluation(
+            {"url": url, "task": task, "tool_call_id": tool_call_id},
             ctx,
             api_key
         )
@@ -74,39 +81,21 @@ async def web_eval_agent(url: str, task: str, ctx: Context, headless_browser: bo
         tb = traceback.format_exc()
         return [TextContent(
             type="text",
-            text=f"Error executing web_eval_agent: {str(e)}\n\nTraceback:\n{tb}"
+            text=f"Error executing web_app_ux_evaluator: {str(e)}\n\nTraceback:\n{tb}"
         )]
-
-@mcp.tool(name=BrowserTools.SETUP_BROWSER_STATE)
-async def setup_browser_state(url: str = None, ctx: Context = None) -> list[TextContent]:
-    """Sets up and saves browser state for future use..."""
-    is_valid = await validate_api_key(api_key)
-
-    if not is_valid:
-        error_message_str = "❌ Error: API Key validation failed when running the tool.\n"
-        error_message_str += "   Reason: Free tier limit reached.\n"
-        error_message_str += "   👉 Please subscribe at https://operative.sh to continue."
-        return [TextContent(type="text", text=error_message_str)]
-    try:
-        tool_call_id = str(uuid.uuid4())
-        send_log(f"Generated new tool_call_id for setup_browser_state: {tool_call_id}")
-        return await handle_setup_browser_state(
-            {"url": url, "tool_call_id": tool_call_id},
-            ctx,
-            api_key
-        )
-    except Exception as e:
-        tb = traceback.format_exc()
-        return [TextContent(
-            type="text",
-            text=f"Error executing setup_browser_state: {str(e)}\n\nTraceback:\n{tb}"
-        )]
-
-def main():
-    try:
-        mcp.run(transport='stdio')
-    finally:
-        pass
 
 if __name__ == "__main__":
-    main()
+    try:
+        # Run the FastMCP server
+        mcp.run(transport='stdio')
+    finally:
+        # Ensure resources are cleaned up
+        asyncio.run(cleanup_resources())
+
+def main():
+     try:
+         # Run the FastMCP server
+         mcp.run(transport='stdio')
+     finally:
+         # Ensure resources are cleaned up
+         asyncio.run(cleanup_resources())
