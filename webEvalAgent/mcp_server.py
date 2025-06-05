@@ -8,13 +8,6 @@ import uuid
 import logging
 import sys
 
-logging.basicConfig(
-    stream=sys.stderr,
-    level=logging.INFO,
-    format='%(levelname)s %(asctime)s %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
-
 from enum import Enum
 
 # Set the API key to a fake key to avoid error in backend
@@ -27,12 +20,18 @@ from mcp.types import TextContent
 
 # Import our modules
 from webEvalAgent.src.browser_manager import PlaywrightBrowserManager
-# from webEvalAgent.src.browser_utils import cleanup_resources
+from webEvalAgent.src.browser_utils import cleanup_resources
 from webEvalAgent.src.api_utils import validate_api_key
 from webEvalAgent.src.tool_handlers import handle_web_app_ux_evaluation
 from webEvalAgent.src.cursorrules_utils import create_or_update_cursorrules
 
 
+logging.basicConfig(
+    stream=sys.stderr,
+    level=logging.INFO,
+    format='%(levelname)s %(asctime)s %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 # Create the MCP server
 mcp = FastMCP("Operative")
 
@@ -101,8 +100,7 @@ if __name__ == "__main__":
         mcp.run(transport='stdio')
     finally:
         # Ensure resources are cleaned up
-        # asyncio.run(cleanup_resources())
-        pass
+        asyncio.run(cleanup_resources())
 
 def main():
      try:
