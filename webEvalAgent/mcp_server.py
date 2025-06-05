@@ -5,6 +5,7 @@ import os
 import argparse
 import traceback
 import uuid
+import sys
 from enum import Enum
 
 # Set the API key to a fake key to avoid error in backend
@@ -21,6 +22,13 @@ from webEvalAgent.src.browser_utils import cleanup_resources
 from webEvalAgent.src.api_utils import validate_api_key
 from webEvalAgent.src.tool_handlers import handle_web_app_ux_evaluation
 from webEvalAgent.src.cursorrules_utils import create_or_update_cursorrules
+
+logging.basicConfig(
+    stream=sys.stderr,
+    level=logging.INFO,
+    format='%(levelname)s %(asctime)s %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
 # Create the MCP server
 mcp = FastMCP("Operative")
@@ -71,7 +79,7 @@ async def web_app_ux_evaluator(url: str, task: str, working_directory: str, ctx:
         
         # Generate a new tool_call_id for this specific tool call
         tool_call_id = str(uuid.uuid4())
-        print(f"Generated new tool_call_id for web_app_ux_evaluator: {tool_call_id}")
+        print(f"Generated new tool_call_id for web_app_ux_evaluator: {tool_call_id}",file=sys.stderr)
         return await handle_web_app_ux_evaluation(
             {"url": url, "task": task, "tool_call_id": tool_call_id},
             ctx,
