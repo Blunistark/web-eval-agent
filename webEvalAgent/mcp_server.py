@@ -102,6 +102,7 @@ if __name__ == "__main__":
     finally:
         # Ensure resources are cleaned up
         # asyncio.run(cleanup_resources())
+        pass
 
 def main():
      try:
