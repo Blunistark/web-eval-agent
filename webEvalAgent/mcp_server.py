@@ -5,7 +5,16 @@ import os
 import argparse
 import traceback
 import uuid
+import logging
 import sys
+
+logging.basicConfig(
+    stream=sys.stderr,
+    level=logging.INFO,
+    format='%(levelname)s %(asctime)s %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
 from enum import Enum
 
 # Set the API key to a fake key to avoid error in backend
@@ -23,12 +32,6 @@ from webEvalAgent.src.api_utils import validate_api_key
 from webEvalAgent.src.tool_handlers import handle_web_app_ux_evaluation
 from webEvalAgent.src.cursorrules_utils import create_or_update_cursorrules
 
-logging.basicConfig(
-    stream=sys.stderr,
-    level=logging.INFO,
-    format='%(levelname)s %(asctime)s %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
 
 # Create the MCP server
 mcp = FastMCP("Operative")
@@ -48,9 +51,9 @@ api_key = os.environ.get('OPERATIVE_API_KEY')
 if api_key:
     is_valid = asyncio.run(validate_api_key(api_key))
     if not is_valid:
-        print("Error: Invalid API key. Please provide a valid OperativeAI API key in the OPERATIVE_API_KEY environment variable.")
+        logging.info("Error: Invalid API key. Please provide a valid OperativeAI API key in the OPERATIVE_API_KEY environment variable.")
 else:
-    print("Error: No API key provided. Please set the OPERATIVE_API_KEY environment variable.")
+    logging.info("Error: No API key provided. Please set the OPERATIVE_API_KEY environment variable.")
 
 @mcp.tool(name=BrowserTools.WEB_APP_UX_EVALUATOR)
 async def web_app_ux_evaluator(url: str, task: str, working_directory: str, ctx: Context) -> list[TextContent]:
@@ -79,7 +82,7 @@ async def web_app_ux_evaluator(url: str, task: str, working_directory: str, ctx:
         
         # Generate a new tool_call_id for this specific tool call
         tool_call_id = str(uuid.uuid4())
-        print(f"Generated new tool_call_id for web_app_ux_evaluator: {tool_call_id}",file=sys.stderr)
+        logging.info(f"Generated new tool_call_id for web_app_ux_evaluator: {tool_call_id}")
         return await handle_web_app_ux_evaluation(
             {"url": url, "task": task, "tool_call_id": tool_call_id},
             ctx,
